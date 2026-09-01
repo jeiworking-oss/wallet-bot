@@ -1,3 +1,5 @@
+import uuid
+from datetime import datetime, timezone
 import json
 import os
 import requests
@@ -20,11 +22,10 @@ MIS_BILLETERAS = {
     "naranjax": "f82db9a5-869a-4e4b-9132-4754117fb6f9",
     "naranja": "f82db9a5-869a-4e4b-9132-4754117fb6f9",
     "nexo": "83ab2474-6b86-48e1-995b-ad6a8a0a0b1a",
-    "santander": "0d855ecf-3ddd-4954-a4de-08673da9a535",
+    "santander": "0d855ecf-3dd0-4954-a4de-08673da9a535",
     "tdcnaranjax": "1aa446c0-d01e-4f22-b572-238979fc0a48",
     "tarjetanaranja": "1aa446c0-d01e-4f22-b572-238979fc0a48",
 }
-
 
 @app.route(f"/webhook/{TELEGRAM_TOKEN}", methods=["POST"])
 def receive_telegram_message():
@@ -42,9 +43,7 @@ def receive_telegram_message():
       return jsonify({"status": "no_chat_id"}), 200
 
     if not texto_usuario:
-      enviar_respuesta_telegram(
-          chat_id, "⚠️ Por ahora solo estoy procesando mensajes de texto."
-      )
+      enviar_respuesta_telegram(chat_id, "⚠️ Por ahora solo estoy procesando mensajes de texto.")
       return jsonify({"status": "no_text"}), 200
 
     prompt_base = """
@@ -59,56 +58,36 @@ def receive_telegram_message():
 
     gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     payload_gemini = {
-        "contents": [{
-            "parts": [{
-                "text": f"{prompt_base}\n\nMensaje del usuario: '{texto_usuario}'"
-            }]
-        }],
+        "contents": [{"parts": [{"text": f"{prompt_base}\n\nMensaje del usuario: '{texto_usuario}'"}]}],
         "generationConfig": {"response_mime_type": "application/json"},
     }
 
     try:
       res_gemini = requests.post(gemini_url, json=payload_gemini, timeout=180)
       if res_gemini.status_code != 200:
-        print(f"Error de Gemini: {res_gemini.text}")
-        enviar_respuesta_telegram(
-            chat_id, "❌ Error de comunicación con el motor de IA."
-        )
+        enviar_respuesta_telegram(chat_id, "❌ Error de comunicación con el motor de IA.")
         return jsonify({"status": "gemini_error"}), 200
     except Exception as gemini_err:
-      print(f"Timeout con Gemini: {gemini_err}")
-      enviar_respuesta_telegram(
-          chat_id, "⚠️ El motor de IA tardó demasiado en responder."
-      )
+      enviar_respuesta_telegram(chat_id, "⚠️ El motor de IA tardó demasiado en responder.")
       return jsonify({"status": "gemini_timeout"}), 200
 
     res_json = res_gemini.json()
     candidates = res_json.get("candidates", [])
     if not candidates:
-      enviar_respuesta_telegram(
-          chat_id, "⚠️ No obtuve respuesta válida de la IA."
-      )
+      enviar_respuesta_telegram(chat_id, "⚠️ No obtuve respuesta válida de la IA.")
       return jsonify({"status": "no_candidates"}), 200
 
-    texto_respuesta = (
-        candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
-    )
+    texto_respuesta = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
 
     try:
       parsed_data = json.loads(texto_respuesta)
-      transacciones = (
-          parsed_data if isinstance(parsed_data, list) else [parsed_data]
-      )
+      transacciones = parsed_data if isinstance(parsed_data, list) else [parsed_data]
     except json.JSONDecodeError:
-      enviar_respuesta_telegram(
-          chat_id, "⚠️ El formato devuelto por la IA no fue un JSON válido."
-      )
+      enviar_respuesta_telegram(chat_id, "⚠️ El formato devuelto por la IA no fue un JSON válido.")
       return jsonify({"status": "json_decode_error"}), 200
 
     if not transacciones:
-      enviar_respuesta_telegram(
-          chat_id, "⚠️ No pude detectar ningún gasto válido en tu mensaje."
-      )
+      enviar_respuesta_telegram(chat_id, "⚠️ No pude detectar ningún gasto válido en tu mensaje.")
       return jsonify({"status": "no_transactions"}), 200
 
     payloads_wallet = []
@@ -118,20 +97,32 @@ def receive_telegram_message():
       billetera_sugerida = str(tx.get("wallet", "")).lower()
 
       if monto > 0:
-        # Estructura limpia sin 'date', sin 'currency', sin 'type'
-        item = {"amount": -abs(monto), "note": concepto}
+        # Objeto estructuralmente perfecto para la Sync API de BudgetBakers
+        item = {
+            "id": str(uuid.uuid4()), # Previene duplicados absolutos
+            "amount": -abs(monto),
+            "recordDate": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z'), # Formato ISO estricto
+            "note": concepto,
+            "paymentType": "debit_card", # Valor estándar
+            "recordState": "cleared"     # Forzamos estado liquidado
+        }
 
+        # Búsqueda de cuenta con Fallback obligatorio
+        cuenta_asignada = False
         for key, acc_id in MIS_BILLETERAS.items():
           if key in billetera_sugerida:
             item["accountId"] = acc_id
+            cuenta_asignada = True
             break
+        
+        # Si la IA no detectó billetera, lo mandamos a Efectivo para que no explote la API por falta de accountId
+        if not cuenta_asignada:
+            item["accountId"] = MIS_BILLETERAS["efectivo"]
 
         payloads_wallet.append(item)
 
     if not payloads_wallet:
-      enviar_respuesta_telegram(
-          chat_id, "⚠️ Se detectó texto pero ningún monto válido para registrar."
-      )
+      enviar_respuesta_telegram(chat_id, "⚠️ Se detectó texto pero ningún monto válido para registrar.")
       return jsonify({"status": "no_valid_amounts"}), 200
 
     headers_wallet = {
@@ -139,33 +130,23 @@ def receive_telegram_message():
         "Content-Type": "application/json",
     }
 
-    res_wallet = requests.post(
-        WALLET_API_URL, json=payloads_wallet, headers=headers_wallet, timeout=180
-    )
+    res_wallet = requests.post(WALLET_API_URL, json=payloads_wallet, headers=headers_wallet, timeout=180)
 
     if res_wallet.status_code in [200, 201]:
-      enviar_respuesta_telegram(
-          chat_id,
-          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en tu Wallet.",
-      )
+      enviar_respuesta_telegram(chat_id, f"✅ Hit conectado: Se registraron {len(payloads_wallet)} transacción(es) con éxito en tu Wallet.")
     else:
       print(f"Error en Wallet API ({res_wallet.status_code}): {res_wallet.text}")
-      enviar_respuesta_telegram(
-          chat_id, f"⚠️ La API de Wallet rechazó el registro: {res_wallet.text}"
-      )
+      enviar_respuesta_telegram(chat_id, f"⚠️ La API de Wallet rechazó el registro: {res_wallet.text}")
 
   except Exception as e:
     print(f"Error crítico global: {e}")
     if chat_id:
       try:
-        enviar_respuesta_telegram(
-            chat_id, "❌ Ocurrió un error inesperado procesando tu solicitud."
-        )
+        enviar_respuesta_telegram(chat_id, "❌ Ocurrió un error inesperado procesando tu solicitud.")
       except:
         pass
 
   return jsonify({"status": "success"}), 200
-
 
 def enviar_respuesta_telegram(chat_id, texto):
   if not TELEGRAM_TOKEN or not chat_id:
@@ -175,7 +156,6 @@ def enviar_respuesta_telegram(chat_id, texto):
     requests.post(url, json={"chat_id": chat_id, "text": texto}, timeout=15)
   except Exception as e:
     print(f"Error enviando mensaje a Telegram: {e}")
-
 
 if __name__ == "__main__":
   port = int(os.environ.get("PORT", 5000))
