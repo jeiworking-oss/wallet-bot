@@ -63,7 +63,7 @@ def receive_telegram_message():
         Si no hay montos, devuelve [].
         """
 
-    # Llamada a Gemini con manejo de excepciones por timeout
+    # Llamada a Gemini con manejo de excepciones por timeout holgado
     try:
       response = ai_client.models.generate_content(
           model="gemini-2.5-flash",
@@ -74,10 +74,11 @@ def receive_telegram_message():
       )
       texto_respuesta = response.text if response.text else "[]"
     except Exception as gemini_err:
-      print(f"Error con Gemini (timeout de 60s alcanzado o fallo): {gemini_err}")
+      print(f"Error con Gemini (timeout de 180s alcanzado): {gemini_err}")
       enviar_respuesta_telegram(
           chat_id,
-          "⚠️ El motor de IA tardó demasiado en responder. Intenta de nuevo.",
+          "⚠️ El servidor despertó tarde o la IA tardó demasiado. Intenta de"
+          " nuevo.",
       )
       return jsonify({"status": "gemini_timeout"}), 200
 
@@ -129,20 +130,22 @@ def receive_telegram_message():
         "Content-Type": "application/json",
     }
 
-    # Petición a Wallet con timeout holgado de 60 segundos
+    # Petición a Wallet con timeout blindado de 180 segundos (3 minutos)
     res_wallet = requests.post(
-        WALLET_API_URL, json=payloads_wallet, headers=headers_wallet, timeout=60
+        WALLET_API_URL, json=payloads_wallet, headers=headers_wallet, timeout=180
     )
 
     if res_wallet.status_code in [200, 201]:
       enviar_respuesta_telegram(
           chat_id,
-          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en tu Wallet.",
+          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en"
+          " tu Wallet.",
       )
     else:
       print(f"Error en Wallet API ({res_wallet.status_code}): {res_wallet.text}")
       enviar_respuesta_telegram(
-          chat_id, f"⚠️ La API de Wallet rechazó el registro: {res_wallet.text}"
+          chat_id,
+          f"⚠️ La API de Wallet rechazó el registro: {res_wallet.text}",
       )
 
   except Exception as e:
@@ -163,7 +166,7 @@ def enviar_respuesta_telegram(chat_id, texto):
     return
   url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
   try:
-    requests.post(url, json={"chat_id": chat_id, "text": texto}, timeout=10)
+    requests.post(url, json={"chat_id": chat_id, "text": texto}, timeout=15)
   except Exception as e:
     print(f"Error enviando mensaje a Telegram: {e}")
 
