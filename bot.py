@@ -12,7 +12,7 @@ WALLET_TOKEN = os.environ.get("WALLET_TOKEN")
 
 WALLET_API_URL = "https://rest.budgetbakers.com/wallet/v1/api/records"
 
-# Mapeo oficial con los IDs reales de tus cuentas
+# Mapeo oficial y exacto con los IDs reales de tus cuentas
 MIS_BILLETERAS = {
     "arq": "19240bbe-84a9-4ae6-b826-f3ecbeff1cf0",
     "efectivo": "db88efbb-5174-47ac-ac9e-d22c0b894dca",
@@ -51,7 +51,7 @@ def receive_telegram_message():
     prompt_base = """
         Analiza el texto del usuario y extrae los gastos o transacciones financieras.
         Devuelve estrictamente una lista JSON pura con objetos que tengan exactamente estas claves:
-        - "amount": número decimal con el monto total de la transacción.
+        - "amount": número decimal positivo con el monto total de la transacción.
         - "note": concepto limpio y descriptivo del gasto.
         - "wallet": cuenta mencionada (arq, efectivo, mercadopago, naranjax, nexo, santander, tdcnaranjax) o null si no se especifica.
         Ejemplo de salida esperada: [{"amount": 18409.0, "note": "burga mcdonals", "wallet": "mercadopago"}]
@@ -111,11 +111,10 @@ def receive_telegram_message():
       billetera_sugerida = str(tx.get("wallet", "")).lower()
 
       if monto > 0:
-        # Sin el campo "currency" que rechazaba la API de BudgetBakers
+        # Estructura pura y exacta aceptada por BudgetBakers (sin 'currency' y sin 'type')
         item = {
-            "amount": monto,
+            "amount": -abs(monto),  # Monto negativo para registrar como gasto
             "note": concepto,
-            "type": 1,
             "date": datetime.now().isoformat(),
         }
 
@@ -144,7 +143,7 @@ def receive_telegram_message():
     if res_wallet.status_code in [200, 201]:
       enviar_respuesta_telegram(
           chat_id,
-          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en tu cuenta de Wallet.",
+          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en tu Wallet.",
       )
     else:
       print(f"Error en Wallet API ({res_wallet.status_code}): {res_wallet.text}")
@@ -174,10 +173,6 @@ def enviar_respuesta_telegram(chat_id, texto):
   except Exception as e:
     print(f"Error enviando mensaje a Telegram: {e}")
 
-
-if __name__ == "__main__":
-  port = int(os.environ.get("PORT", 5000))
-  app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
   port = int(os.environ.get("PORT", 5000))
