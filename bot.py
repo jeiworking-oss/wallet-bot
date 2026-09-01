@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime, timezone
 import json
 import os
@@ -97,17 +96,13 @@ def receive_telegram_message():
       billetera_sugerida = str(tx.get("wallet", "")).lower()
 
       if monto > 0:
-        # Objeto estructuralmente perfecto para la Sync API de BudgetBakers
+        # Los únicos 4 campos que el servidor exige y acepta. Ni uno más.
         item = {
-            "id": str(uuid.uuid4()), # Previene duplicados absolutos
             "amount": -abs(monto),
-            "recordDate": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z'), # Formato ISO estricto
-            "note": concepto,
-            "paymentType": "debit_card", # Valor estándar
-            "recordState": "cleared"     # Forzamos estado liquidado
+            "recordDate": datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.000Z'),
+            "note": concepto
         }
 
-        # Búsqueda de cuenta con Fallback obligatorio
         cuenta_asignada = False
         for key, acc_id in MIS_BILLETERAS.items():
           if key in billetera_sugerida:
@@ -115,7 +110,7 @@ def receive_telegram_message():
             cuenta_asignada = True
             break
         
-        # Si la IA no detectó billetera, lo mandamos a Efectivo para que no explote la API por falta de accountId
+        # Fallback a Efectivo si no se detecta billetera
         if not cuenta_asignada:
             item["accountId"] = MIS_BILLETERAS["efectivo"]
 
