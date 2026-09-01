@@ -111,11 +111,11 @@ def receive_telegram_message():
       billetera_sugerida = str(tx.get("wallet", "")).lower()
 
       if monto > 0:
-        # Estructura pura y exacta aceptada por BudgetBakers (sin 'currency' y sin 'type')
+        # Estructura exacta validada contra la referencia de la API de BudgetBakers
         item = {
-            "amount": -abs(monto),  # Monto negativo para registrar como gasto
+            "amount": -abs(monto),  # Negativo para registrar como gasto
             "note": concepto,
-            "date": datetime.now().isoformat(),
+            "date": datetime.now().isoformat() + "Z",
         }
 
         for key, acc_id in MIS_BILLETERAS.items():
