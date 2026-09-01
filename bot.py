@@ -4,8 +4,8 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Credenciales de Meta
-WHATSAPP_TOKEN = "EAANgYkDRhoEBSQI1PWEzmaf3OKf2nmTxPMGvTosakm7qbMM19TMv0vCuogToo4PWZAJEXgmM01BqVLEChup3hqZC55dyWd9NajXuTXYLvN3FxvWKqOB3W6MQ5cqBN8EeserjQNykxLEZBJ5HLkxExxoffYeflmwr0edCqVYgML4qixw8G93wweX0os7ExdngDtQ6LPvOlOYBCkbckohQOakjbSh2RGjTgHdRehJSc35g5RdlHHZAYioBUAsiogddZB2tqG2UDonE4qO16uwZDZD"
+# Credenciales de Meta actualizadas
+WHATSAPP_TOKEN = "EAANgYkDRhoEBSTudt8jbFhVtaDkiWtieRqxwrToABrMk2T1IDzI5dwYyIGO50QEH8pRZAlYyf2bzdih96eUEusGgbq7v3TOWaFeBSBO8oagyPivQwcZCtA4R6WLrE68aw9StiMDHzEjVqYY2nX8H7htghmJAtgtUCF6ZCM99huqpNZBEsVLs1hbKeEZCLZBIv6cqTroegbF6CfS2ty4iPTbFNpDVV6yQejXecPaRcQ7L5EtmTkDKt0p4ZCGD7cKgaU7KmKm53R7ZCZAPvzPT53ZCoZD"
 PHONE_NUMBER_ID = "1295700236962501"
 
 # Credenciales de Wallet by BudgetBakers
@@ -98,9 +98,6 @@ def enviar_respuesta_whatsapp(destinatario, texto):
   requests.post(url, json=payload, headers=headers)
 
 
-if __name__ == "__main__":
-  port = int(os.environ.get("PORT", 5000))
-  app.run(host="0.0.0.0", port=port)
 if __name__ == "__main__":
   port = int(os.environ.get("PORT", 5000))
   app.run(host="0.0.0.0", port=port)
