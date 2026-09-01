@@ -5,11 +5,11 @@ from flask import Flask, jsonify, request
 app = Flask(__name__)
 
 # Credenciales de Meta
-WHATSAPP_TOKEN = "AQUÍ_PEGA_TU_TOKEN_DE_ACCESO_DE_META"
+WHATSAPP_TOKEN = "EAANgYkDRhoEBSQI1PWEzmaf3OKf2nmTxPMGvTosakm7qbMM19TMv0vCuogToo4PWZAJEXgmM01BqVLEChup3hqZC55dyWd9NajXuTXYLvN3FxvWKqOB3W6MQ5cqBN8EeserjQNykxLEZBJ5HLkxExxoffYeflmwr0edCqVYgML4qixw8G93wweX0os7ExdngDtQ6LPvOlOYBCkbckohQOakjbSh2RGjTgHdRehJSc35g5RdlHHZAYioBUAsiogddZB2tqG2UDonE4qO16uwZDZD"
 PHONE_NUMBER_ID = "1295700236962501"
 
 # Credenciales de Wallet by BudgetBakers
-WALLET_TOKEN = "AQUÍ_PEGA_TU_TOKEN_DE_WALLET"
+WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiI5V2xsZXQiLCJzdWIiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc2NzM1MCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyMzEzNTAsImp0aSI6ImZmYzhmZWRiLWE2ODQtNDY2ZC1iZDAxLTgzZTQxNjA1OGU2YiIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.kYNZRFZqBXI3u25OuxZKGcGgx8TyAU3J4Y2ehrjojM5kEI2lbTfJHe5wYSuaGE0PXJN-CgxaB5KdFF3-3ogBIa1r0zG16RYnTDs6w2CDzAbWm5sRFO9EPCct5ZyGQ28AJddrHSAIhLODsyuGigl_xSmdtCwJwPTh7xxgnEcPfW5SyIx5AE0TY6EDnoXstPJ0kmszat3RGH_aD7G-ulXYDn5KIJbCgjv2if7l-Wal9mNjfKtcmYxVSGJSckwLSWqPldJonOR6_o6jKGQIyeP6pta0LT_Mnw8LgHp_EM78cmrHOI10kRdRxhCEErgNHW4FUdmj6ZhrCt-RdH37MsBbGA"
 WALLET_API_URL = "https://rest.budgetbakers.com/wallet/v1/api/records"
 
 
@@ -53,7 +53,7 @@ def receive_message():
       monto = float(partes[0])
       concepto = partes[1] if len(partes) > 1 else "Gasto general"
 
-      payload_wallet = {
+      payload_workspace = {
           "amount": monto,
           "currency": "ARS",
           "note": concepto,
@@ -67,7 +67,7 @@ def receive_message():
       }
 
       response = requests.post(
-          WALLET_API_URL, json=payload_wallet, headers=headers_wallet
+          WALLET_API_URL, json=payload_workspace, headers=headers_wallet
       )
 
       if response.status_code in [200, 201]:
