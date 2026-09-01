@@ -6,14 +6,14 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Credenciales de entorno y token de Wallet
+# Credenciales leídas limpiamente del entorno para evitar corrupción de tokens
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc3NjkxMCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyNDA5MTAsImp0aSI6ImIxNjgzNTdmLWQ2ZWYtNDZlZi1hYjc0LTAwNTFhNzliNGY5MCIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.BYqlLm0cNUgt5zIsN8VPSLCt89x7IQmxL5a9IjfvmyyjBSh2eQgvmbQ1qqCG7L4OyjFOKzyHdExMyQ9m7g4fxrHF4I1ZtrIojhYljLvfZuKrgT-1IXGAQgF-tsIMAuaTQsPRrBLE28URn-ecAlvufTRW8yM9I6MSmQDL9PRBlSBhqxi-iVi1LfDpljrxsD2tpSWfZFJ8Ft9O7mlgPwvpNNJEZCKlOKteKyFRxQ7RkKWmKA_ekWi4ZCIsHWggUeod8SRp5GYO8ZWmLu8G_S82dEm3DPegt0nDooks-ff5PacXQ-vwviIFh9KiylFgCWG7u3WF2wqaIL80ONALRqcI8g"
+WALLET_TOKEN = os.environ.get("WALLET_TOKEN")
 
 WALLET_API_URL = "https://rest.budgetbakers.com/wallet/v1/api/records"
 
-# Mapeo oficial y exacto con los IDs reales extraídos de tu cuenta
+# Mapeo oficial con los IDs reales extraídos de tu cuenta
 MIS_BILLETERAS = {
     "arq": "19240bbe-84a9-4ae6-b826-f3ecbeff1cf0",
     "efectivo": "db88efbb-5174-47ac-ac9e-d22c0b894dca",
@@ -145,7 +145,7 @@ def receive_telegram_message():
     if res_wallet.status_code in [200, 201]:
       enviar_respuesta_telegram(
           chat_id,
-          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en tu cuenta de Wallet rey.",
+          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en tu cuenta de Wallet.",
       )
     else:
       print(f"Error en Wallet API ({res_wallet.status_code}): {res_wallet.text}")
