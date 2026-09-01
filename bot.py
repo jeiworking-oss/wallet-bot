@@ -11,14 +11,18 @@ app = Flask(__name__)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiJXYWxsZXQiLCJzdWIiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc2NzM1MCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyMzEzTSIsImp0aSI6ImZmYzhmZWRiLWE2ODQtNDY2ZC1iZDAxLTgzZTQxNjA1OGU2YiIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.kYNZRFZqBXI3u25OuxZKGcGgx8TyAU3J4Y2ehrjojM5kEI2lbTfJHe5wYSuaGE0PXJN-CgxaB5KdFF3-3ogBIa1r0zG16RYnTDs6w2CDzAbWm5sRFO9EPCct5ZyGQ28AJddrHSAIhLODsyuGigl_xSmdtCwJwPTh7xxgnEcPfW5SyIx5AE0TY6EDnoXstPJ0kmszat3RGH_aD7G-ulXYDn5KIJbCgjv2if7l-Wal9mNjfKtcmYxVSGJSckwLSWqPldJonOR6_o6jKGQIyeP6pta0LT_Mnw8LgHp_EM78cmrHOI10kRdRxhCEErgNHW4FUdmj6ZhrCt-RdH37MsBbGA"
+WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiJXYWxsZXQiLCJzdWIiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc2NzM1MCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyMzEzNTAsImp0aSI6ImZmYzhmZWRiLWE2ODQtNDY2ZC1iZDAxLTgzZTQxNjA1OGU2YiIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.kYNZRFZqBXI3u25OuxZKGcGgx8TyAU3J4Y2ehrjojM5kEI2lbTfJHe5wYSuaGE0PXJN-CgxaB5KdFF3-3ogBIa1r0zG16RYnTDs6w2CDzAbWm5sRFO9EPCct5ZyGQ28AJddrHSAIhLODsyuGigl_xSmdtCwJwPTh7xxgnEcPfW5SyIx5AE0TY6EDnoXstPJ0kmszat3RGH_aD7G-ulXYDn5KIJbCgjv2if7l-Wal9mNjfKtcmYxVSGJSckwLSWqPldJonOR6_o6jKGQIyeP6pta0LT_Mnw8LgHp_EM78cmrHOI10kRdRxhCEErgNHW4FUdmj6ZhrCt-RdH37MsBbGA"
 WALLET_API_URL = "https://rest.budgetbakers.com/wallet/v1/api/records"
 
-# Mapeo de tus billeteras (puedes agregar los IDs reales de tus cuentas de BudgetBakers aquí)
+# Mapeo actualizado con tus billeteras reales de Wallet
 MIS_BILLETERAS = {
-    "efectivo": "ID_CUENTA_EFECTIVO_AQUI",
-    "mercadopago": "ID_CUENTA_MP_AQUI",
-    "uala": "ID_CUENTA_UALA_AQUI",
+    "efectivo": "efectivo",
+    "santander": "santander",
+    "naranjax": "naranjax",
+    "mercadopago": "mercadopago",
+    "tdcnaranjax": "tdc_naranjax",
+    "nexo": "nexo",
+    "arq": "arq",
 }
 
 # Inicializar cliente de Gemini pasando explícitamente la API Key del entorno
@@ -41,12 +45,13 @@ def receive_telegram_message():
         Eres un asistente financiero experto en parsear gastos para BudgetBakers Wallet.
         Analiza el texto o la(s) imagen(es) provista(s) por el usuario.
         El usuario puede enviar una o varias transacciones juntas (en texto o en una captura de pantalla de comprobantes).
+        Tiene configuradas las siguientes cuentas o billeteras: Efectivo, Santander, NaranjaX, MercadoPago, TDC NaranjaX, Nexo, ARQ.
         Devuelve estrictamente un JSON que sea una LISTA de objetos (incluso si es solo uno), con este formato exacto por cada transacción:
         [
           {
             "amount": 1500.0,
             "note": "concepto limpio",
-            "wallet": "nombre aproximado de la billetera mencionada o detectada (ej: efectivo, mercadopago, uala, o null si no se sabe)"
+            "wallet": "nombre exacto o aproximado de la billetera mencionada o detectada de la lista anterior, o null si no se sabe"
           }
         ]
         Si no hay montos válidos, devuelve una lista vacía []. No agregues markdown extra (como ```json), devuelve únicamente el texto JSON puro.
@@ -78,7 +83,6 @@ def receive_telegram_message():
       contenido_para_ia = [f"{prompt_base}\n\nMensaje: '{texto_usuario}'"]
 
     if contenido_para_ia:
-      # Actualizado al modelo que sugirió la API de Google
       response = client.models.generate_content(
           model="gemini-3.6-flash", contents=contenido_para_ia
       )
@@ -129,8 +133,7 @@ def receive_telegram_message():
 
       enviar_respuesta_telegram(
           chat_id,
-          f"✅ Se registraron {registros_exitosos} transacción(es) con"
-          " éxito rey.",
+          f"✅ Se registraron {registros_exitosos} transacción(es) con éxito.",
       )
 
   except Exception as e:
