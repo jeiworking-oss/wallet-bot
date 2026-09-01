@@ -49,18 +49,17 @@ def receive_telegram_message():
         Eres un asistente financiero experto en parsear gastos para BudgetBakers Wallet.
         Analiza el texto provisto por el usuario. Puede contener una o varias transacciones juntas.
         Tiene configuradas las siguientes cuentas o billeteras: Efectivo, Santander, NaranjaX, MercadoPago, TDC NaranjaX, Nexo, ARQ.
-        Devuelve estrictamente un JSON que sea una LISTA de objetos, con este formato exacto por cada transacción:
+        Devuelve estrictamente un JSON puro que sea una LISTA de objetos, con este formato exacto por cada transacción:
         [
           {
-            "amount": 1500.0,
+            "amount": 18409.0,
             "note": "concepto limpio",
-            "wallet": "nombre exacto o aproximado de la billetera mencionada o detectada de la lista anterior, o null si no se sabe"
+            "wallet": "mercadopago"
           }
         ]
-        Si no hay montos válidos, devuelve una lista vacía []. No agregues markdown ni bloques de código extra, devuelve únicamente el texto JSON puro.
+        No pongas texto explicativo antes ni después. No uses bloques de markdown como json. Devuelve solamente el arreglo JSON plano.
         """
 
-    # Usamos gemini-2.0-flash para asegurar compatibilidad total con la API REST
     gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     payload_gemini = {
         "contents": [{
@@ -73,39 +72,41 @@ def receive_telegram_message():
     res_gemini = requests.post(gemini_url, json=payload_gemini)
     res_json = res_gemini.json()
 
-    # Extracción robusta del texto de respuesta
+    # Imprimir en logs de Render para depurar cualquier detalle exacto
+    print("Respuesta cruda de Gemini:", json.dumps(res_json))
+
+    texto_respuesta = ""
     try:
       texto_respuesta = (
           res_json.get("candidates", [])[0]
           .get("content", {})
           .get("parts", [])[0]
-          .get("text", "[]")
+          .get("text", "")
       )
     except Exception as ex:
-      print(f"Error parseando JSON de Gemini: {ex}, Respuesta: {res_json}")
+      print(f"Error extrayendo partes de Gemini: {ex}")
+
+    # Limpieza exhaustiva de markdown por si la IA insiste en ponerlo
+    texto_respuesta = (
+        texto_respuesta.replace("```json", "")
+        .replace("```", "")
+        .strip()
+    )
+
+    if not texto_respuesta:
       enviar_respuesta_telegram(
-          chat_id, "⚠️ Error interpretando la respuesta de la IA."
+          chat_id, "⚠️ La IA no devolvió contenido válido."
       )
       return jsonify({"status": "success"}), 200
 
-    texto_respuesta = (
-        texto_respuesta.replace("```json", "").replace("```", "").strip()
-    )
     parsed_data = json.loads(texto_respuesta)
-
     transacciones = (
         parsed_data if isinstance(parsed_data, list) else [parsed_data]
     )
 
-    if not transacciones:
-      enviar_respuesta_telegram(
-          chat_id, "⚠️ No pude detectar ningún gasto válido en tu mensaje."
-      )
-      return jsonify({"status": "success"}), 200
-
     registros_exitosos = 0
     for tx in transacciones:
-      monto = tx.get("amount", 0)
+      monto = float(tx.get("amount", 0))
       concepto = tx.get("note", "Gasto general")
       billetera_sugerida = str(tx.get("wallet", "")).lower()
 
@@ -139,7 +140,7 @@ def receive_telegram_message():
     )
 
   except Exception as e:
-    print(f"Error procesando solicitud: {e}")
+    print(f"Error procesando solicitud general: {e}")
     if chat_id and TELEGRAM_TOKEN:
       enviar_respuesta_telegram(
           chat_id, "❌ Ocurrió un error procesando tu gasto."
