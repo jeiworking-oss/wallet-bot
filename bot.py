@@ -6,14 +6,13 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Credenciales leídas limpiamente del entorno para evitar corrupción de tokens
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 WALLET_TOKEN = os.environ.get("WALLET_TOKEN")
 
 WALLET_API_URL = "https://rest.budgetbakers.com/wallet/v1/api/records"
 
-# Mapeo oficial con los IDs reales extraídos de tu cuenta
+# Mapeo oficial con los IDs reales de tus cuentas
 MIS_BILLETERAS = {
     "arq": "19240bbe-84a9-4ae6-b826-f3ecbeff1cf0",
     "efectivo": "db88efbb-5174-47ac-ac9e-d22c0b894dca",
@@ -112,9 +111,9 @@ def receive_telegram_message():
       billetera_sugerida = str(tx.get("wallet", "")).lower()
 
       if monto > 0:
+        # Sin el campo "currency" que rechazaba la API de BudgetBakers
         item = {
             "amount": monto,
-            "currency": "ARS",
             "note": concepto,
             "type": 1,
             "date": datetime.now().isoformat(),
@@ -150,7 +149,7 @@ def receive_telegram_message():
     else:
       print(f"Error en Wallet API ({res_wallet.status_code}): {res_wallet.text}")
       enviar_respuesta_telegram(
-          chat_id, "⚠️ La API de Wallet rechazó el registro."
+          chat_id, f"⚠️ La API de Wallet rechazó el registro: {res_wallet.text}"
       )
 
   except Exception as e:
@@ -175,6 +174,10 @@ def enviar_respuesta_telegram(chat_id, texto):
   except Exception as e:
     print(f"Error enviando mensaje a Telegram: {e}")
 
+
+if __name__ == "__main__":
+  port = int(os.environ.get("PORT", 5000))
+  app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
   port = int(os.environ.get("PORT", 5000))
