@@ -1,33 +1,31 @@
 from datetime import datetime
 import json
 import os
-from google import genai
-from google.genai import types
 import requests
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Credenciales y URLs
+# Credenciales de entorno y token de Wallet
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc3NjkxMCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyNDA5MTAsImp0aSI6ImIxNjgzNTdmLWQ2ZWYtNDZlZi1hYjc0LTAwNTFhNzliNGY5MCIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.BYqlLm0cNUgt5zIsN8VPSLCt89x7IQmxL5a9IjfvmyyjBSh2eQgvmbQ1qqCG7L4OyjFOKzyHdExMyQ9m7g4fxrHF4I1ZtrIojhYljLvfZuKrgT-1IXGAQgF-tsIMAuaTQsPRrBLE28URn-ecAlvufTRW8yM9I6MSmQDL9PRBlSBhqxi-iVi1LfDpljrxsD2tpSWfZFJ8Ft9O7mlgPwvpNNJEZCKlOKteKyFRxQ7RkKWmKA_ekWi4ZCIsHWggUeod8SRp5GYO8ZWmLu8G_S82dEm3DPegt0nDooks-ff5PacXQ-vwviIFh9KiylFgCWG7u3WF2wqaIL80ONALRqcI8g"
 
 WALLET_API_URL = "https://rest.budgetbakers.com/wallet/v1/api/records"
 
-# Diccionario de cuentas alineado con tu Wallet
+# Mapeo oficial y exacto con los IDs reales extraídos de tu cuenta
 MIS_BILLETERAS = {
-    "efectivo": "ID_REAL_EFECTIVO",
-    "santander": "ID_REAL_SANTANDER",
-    "naranja": "ID_REAL_NARANJAX",
-    "naranjax": "ID_REAL_NARANJAX",
-    "mp": "ID_REAL_MERCADOPAGO",
-    "mercadopago": "ID_REAL_MERCADOPAGO",
-    "astropay": "ID_REAL_ASTROPAY",
+    "arq": "19240bbe-84a9-4ae6-b826-f3ecbeff1cf0",
+    "efectivo": "db88efbb-5174-47ac-ac9e-d22c0b894dca",
+    "mercadopago": "bcd72d7e-f54c-4eb6-8e5f-2e593a215ac0",
+    "mp": "bcd72d7e-f54c-4eb6-8e5f-2e593a215ac0",
+    "naranjax": "f82db9a5-869a-4e4b-9132-4754117fb6f9",
+    "naranja": "f82db9a5-869a-4e4b-9132-4754117fb6f9",
+    "nexo": "83ab2474-6b86-48e1-995b-ad6a8a0a0b1a",
+    "santander": "0d855ecf-3ddd-4954-a4de-08673da9a535",
+    "tdcnaranjax": "1aa446c0-d01e-4f22-b572-238979fc0a48",
+    "tarjetanaranja": "1aa446c0-d01e-4f22-b572-238979fc0a48",
 }
-
-# Inicializar cliente oficial de Gemini
-ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 @app.route(f"/webhook/{TELEGRAM_TOKEN}", methods=["POST"])
@@ -56,19 +54,39 @@ def receive_telegram_message():
         Devuelve estrictamente una lista JSON pura con objetos que tengan exactamente estas claves:
         - "amount": número decimal con el monto total de la transacción.
         - "note": concepto limpio y descriptivo del gasto.
-        - "wallet": cuenta mencionada (efectivo, santander, naranja, mercadopago, astropay) o null si no se especifica.
+        - "wallet": cuenta mencionada (arq, efectivo, mercadopago, naranjax, nexo, santander, tdcnaranjax) o null si no se especifica.
         Ejemplo de salida esperada: [{"amount": 18409.0, "note": "burga mcdonals", "wallet": "mercadopago"}]
         Si no hay montos, devuelve [].
         """
 
-    # Llamada blindada con el SDK oficial (evita bloqueos de timeout de requests)
-    response = ai_client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=f"{prompt_base}\n\nMensaje del usuario: '{texto_usuario}'",
-        config=types.GenerateContentConfig(response_mime_type="application/json"),
-    )
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
+    payload_gemini = {
+        "contents": [{
+            "parts": [{
+                "text": f"{prompt_base}\n\nMensaje del usuario: '{texto_usuario}'"
+            }]
+        }],
+        "generationConfig": {"response_mime_type": "application/json"},
+    }
 
-    texto_respuesta = response.text if response.text else "[]"
+    res_gemini = requests.post(gemini_url, json=payload_gemini, timeout=20)
+    if res_gemini.status_code != 200:
+      enviar_respuesta_telegram(
+          chat_id, "❌ Error de comunicación con el motor de IA."
+      )
+      return jsonify({"status": "gemini_error"}), 200
+
+    res_json = res_gemini.json()
+    candidates = res_json.get("candidates", [])
+    if not candidates:
+      enviar_respuesta_telegram(
+          chat_id, "⚠️ No obtuve respuesta válida de la IA."
+      )
+      return jsonify({"status": "no_candidates"}), 200
+
+    texto_respuesta = (
+        candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
+    )
 
     try:
       parsed_data = json.loads(texto_respuesta)
@@ -103,7 +121,7 @@ def receive_telegram_message():
         }
 
         for key, acc_id in MIS_BILLETERAS.items():
-          if key in billetera_sugerida and not acc_id.startswith("ID_REAL_"):
+          if key in billetera_sugerida:
             item["accountId"] = acc_id
             break
 
@@ -127,16 +145,16 @@ def receive_telegram_message():
     if res_wallet.status_code in [200, 201]:
       enviar_respuesta_telegram(
           chat_id,
-          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito.",
+          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en tu cuenta de Wallet rey.",
       )
     else:
-      print(f"Error en Wallet API: {res_wallet.status_code} - {res_wallet.text}")
+      print(f"Error en Wallet API ({res_wallet.status_code}): {res_wallet.text}")
       enviar_respuesta_telegram(
-          chat_id, "⚠️ La API de Wallet rechazó el lote de registros."
+          chat_id, "⚠️ La API de Wallet rechazó el registro."
       )
 
   except Exception as e:
-    print(f"Error crítico global en el webhook: {e}")
+    print(f"Error crítico global: {e}")
     if chat_id:
       try:
         enviar_respuesta_telegram(
@@ -155,7 +173,7 @@ def enviar_respuesta_telegram(chat_id, texto):
   try:
     requests.post(url, json={"chat_id": chat_id, "text": texto}, timeout=5)
   except Exception as e:
-    print(f"Error enviando mensaje de respuesta a Telegram: {e}")
+    print(f"Error enviando mensaje a Telegram: {e}")
 
 
 if __name__ == "__main__":
