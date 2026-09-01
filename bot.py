@@ -11,7 +11,7 @@ app = Flask(__name__)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiJXYWxsZXQiLCJzdWIiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc2NzM1MCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyMzEzNTAsImp0aSI6ImZmYzhmZWRiLWE2ODQtNDY2ZC1iZDAxLTgzZTQxNjA1OGU2YiIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.kYNZRFZqBXI3u25OuxZKGcGgx8TyAU3J4Y2ehrjojM5kEI2lbTfJHe5wYSuaGE0PXJN-CgxaB5KdFF3-3ogBIa1r0zG16RYnTDs6w2CDzAbWm5sRFO9EPCct5ZyGQ28AJddrHSAIhLODsyuGigl_xSmdtCwJwPTh7xxgnEcPfW5SyIx5AE0TY6EDnoXstPJ0kmszat3RGH_aD7G-ulXYDn5KIJbCgjv2if7l-Wal9mNjfKtcmYxVSGJSckwLSWqPldJonOR6_o6jKGQIyeP6pta0LT_Mnw8LgHp_EM78cmrHOI10kRdRxhCEErgNHW4FUdmj6ZhrCt-RdH37MsBbGA"
+WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiJXYWxsZXQiLCJzdWIiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc2NzM1MCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyMzEzTSIsImp0aSI6ImZmYzhmZWRiLWE2ODQtNDY2ZC1iZDAxLTgzZTQxNjA1OGU2YiIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.kYNZRFZqBXI3u25OuxZKGcGgx8TyAU3J4Y2ehrjojM5kEI2lbTfJHe5wYSuaGE0PXJN-CgxaB5KdFF3-3ogBIa1r0zG16RYnTDs6w2CDzAbWm5sRFO9EPCct5ZyGQ28AJddrHSAIhLODsyuGigl_xSmdtCwJwPTh7xxgnEcPfW5SyIx5AE0TY6EDnoXstPJ0kmszat3RGH_aD7G-ulXYDn5KIJbCgjv2if7l-Wal9mNjfKtcmYxVSGJSckwLSWqPldJonOR6_o6jKGQIyeP6pta0LT_Mnw8LgHp_EM78cmrHOI10kRdRxhCEErgNHW4FUdmj6ZhrCt-RdH37MsBbGA"
 WALLET_API_URL = "https://rest.budgetbakers.com/wallet/v1/api/records"
 
 # Mapeo de tus billeteras (puedes agregar los IDs reales de tus cuentas de BudgetBakers aquí)
@@ -21,7 +21,7 @@ MIS_BILLETERAS = {
     "uala": "ID_CUENTA_UALA_AQUI",
 }
 
-# Inicializar cliente de Gemini
+# Inicializar cliente de Gemini pasando explícitamente la API Key del entorno
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 
@@ -54,23 +54,19 @@ def receive_telegram_message():
 
     # Caso 1: Envía una foto o captura de pantalla
     if "photo" in message:
-      # Telegram manda varios tamaños, agarramos el de mayor resolución (el último)
       photo = message["photo"][-1]
       file_id = photo["file_id"]
 
-      # Obtener ruta de descarga en Telegram
       file_info_res = requests.get(
           f"[https://api.telegram.org/bot](https://api.telegram.org/bot){TELEGRAM_TOKEN}/getFile?file_id={file_id}"
       )
       file_path = file_info_res.json()["result"]["file_path"]
 
-      # Descargar la imagen binaria
       img_res = requests.get(
           f"[https://api.telegram.org/file/bot](https://api.telegram.org/file/bot){TELEGRAM_TOKEN}/{file_path}"
       )
       image_bytes = img_res.content
 
-      # Preparar contenido multimodal para Gemini
       contenido_para_ia = [
           prompt_base,
           types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
@@ -82,12 +78,11 @@ def receive_telegram_message():
       contenido_para_ia = [f"{prompt_base}\n\nMensaje: '{texto_usuario}'"]
 
     if contenido_para_ia:
-      # Llamada a Gemini (soporta texto e imágenes de manera nativa)
+      # Actualizado al modelo que sugirió la API de Google
       response = client.models.generate_content(
-          model="gemini-2.5-flash", contents=contenido_para_ia
+          model="gemini-3.6-flash", contents=contenido_para_ia
       )
 
-      # Limpiar la respuesta por si trae bloques de código markdown
       texto_respuesta = (
           response.text.replace("```json", "")
           .replace("```", "")
@@ -116,7 +111,6 @@ def receive_telegram_message():
               "date": requests.utils.datetime.datetime.now().isoformat(),
           }
 
-          # Asignar billetera si coincide con el mapeo
           for key, acc_id in MIS_BILLETERAS.items():
             if key in billetera_sugerida:
               payload_wallet["accountId"] = acc_id
@@ -136,12 +130,12 @@ def receive_telegram_message():
       enviar_respuesta_telegram(
           chat_id,
           f"✅ Se registraron {registros_exitosos} transacción(es) con"
-          " éxito.",
+          " éxito rey.",
       )
 
   except Exception as e:
     print(f"Error procesando solicitud: {e}")
-    if chat_id:
+    if chat_id and TELEGRAM_TOKEN:
       enviar_respuesta_telegram(
           chat_id, "❌ Ocurrió un error procesando tu gasto."
       )
@@ -150,6 +144,8 @@ def receive_telegram_message():
 
 
 def enviar_respuesta_telegram(chat_id, texto):
+  if not TELEGRAM_TOKEN:
+    return
   url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){TELEGRAM_TOKEN}/sendMessage"
   requests.post(url, json={"chat_id": chat_id, "text": texto})
 
