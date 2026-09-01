@@ -9,7 +9,7 @@ app = Flask(__name__)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiJXYWxsZXQiLCJzdWIiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc2NzM1MCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyMzEzTSIsImp0aSI6ImZmYzhmZWRiLWE2ODQtNDY2ZC1iZDAxLTgzZTQxNjA1OGU2YiIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.kYNZRFZqBXI3u25OuxZKGcGgx8TyAU3J4Y2ehrjojM5kEI2lbTfJHe5wYSuaGE0PXJN-CgxaB5KdFF3-3ogBIa1r0zG16RYnTDs6w2CDzAbWm5sRFO9EPCct5ZyGQ28AJddrHSAIhLODsyuGigl_xSmdtCwJwPTh7xxgnEcPfW5SyIx5AE0TY6EDnoXstPJ0kmszat3RGH_aD7G-ulXYDn5KIJbCgjv2if7l-Wal9mNjfKtcmYxVSGJSckwLSWqPldJonOR6_o6jKGQIyeP6pta0LT_Mnw8LgHp_EM78cmrHOI10kRdRxhCEErgNHW4FUdmj6ZhrCt-RdH37MsBbGA"
+WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc2NzM1MCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyMzEzTSIsImp0aSI6ImZmYzhmZWRiLWE2ODQtNDY2ZC1iZDAxLTgzZTQxNjA1OGU2YiIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.kYNZRFZqBXI3u25OuxZKGcGgx8TyAU3J4Y2ehrjojM5kEI2lbTfJHe5wYSuaGE0PXJN-CgxaB5KdFF3-3ogBIa1r0zG16RYnTDs6w2CDzAbWm5sRFO9EPCct5ZyGQ28AJddrHSAIhLODsyuGigl_xSmdtCwJwPTh7xxgnEcPfW5SyIx5AE0TY6EDnoXstPJ0kmszat3RGH_aD7G-ulXYDn5KIJbCgjv2if7l-Wal9mNjfKtcmYxVSGJSckwLSWqPldJonOR6_o6jKGQIyeP6pta0LT_Mnw8LgHp_EM78cmrHOI10kRdRxhCEErgNHW4FUdmj6ZhrCt-RdH37MsBbGA"
 WALLET_API_URL = "https://rest.budgetbakers.com/wallet/v1/api/records"
 
 # Mapeo de tus billeteras reales de Wallet
@@ -46,63 +46,45 @@ def receive_telegram_message():
       return jsonify({"status": "success"}), 200
 
     prompt_base = """
-        Eres un asistente financiero experto en parsear gastos para BudgetBakers Wallet.
-        Analiza el texto provisto por el usuario. Puede contener una o varias transacciones juntas.
-        Tiene configuradas las siguientes cuentas o billeteras: Efectivo, Santander, NaranjaX, MercadoPago, TDC NaranjaX, Nexo, ARQ.
-        Devuelve estrictamente un JSON puro que sea una LISTA de objetos, con este formato exacto por cada transacción:
-        [
-          {
-            "amount": 18409.0,
-            "note": "concepto limpio",
-            "wallet": "mercadopago"
-          }
-        ]
-        No pongas texto explicativo antes ni después. No uses bloques de markdown como json. Devuelve solamente el arreglo JSON plano.
+        Analiza el texto del usuario y extrae los gastos.
+        Devuelve una lista JSON pura con objetos que tengan exactamente estas claves:
+        - "amount": número decimal con el monto.
+        - "note": concepto limpio del gasto.
+        - "wallet": cuenta mencionada (efectivo, santander, naranjax, mercadopago, tdcnaranjax, nexo, arq) o null si no se especifica.
+        Ejemplo: [{"amount": 18409.0, "note": "burga mcdonals", "wallet": "mercadopago"}]
         """
 
-    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    # URL actualizada al modelo correcto que pide la API
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     payload_gemini = {
         "contents": [{
             "parts": [{
-                "text": f"{prompt_base}\n\nMensaje del usuario: '{texto_usuario}'"
+                "text": f"{prompt_base}\n\nMensaje: '{texto_usuario}'"
             }]
-        }]
+        }],
+        "generationConfig": {"response_mime_type": "application/json"},
     }
 
     res_gemini = requests.post(gemini_url, json=payload_gemini)
     res_json = res_gemini.json()
 
-    # Imprimir en logs de Render para depurar cualquier detalle exacto
-    print("Respuesta cruda de Gemini:", json.dumps(res_json))
-
-    texto_respuesta = ""
-    try:
-      texto_respuesta = (
-          res_json.get("candidates", [])[0]
-          .get("content", {})
-          .get("parts", [])[0]
-          .get("text", "")
-      )
-    except Exception as ex:
-      print(f"Error extrayendo partes de Gemini: {ex}")
-
-    # Limpieza exhaustiva de markdown por si la IA insiste en ponerlo
     texto_respuesta = (
-        texto_respuesta.replace("```json", "")
-        .replace("```", "")
-        .strip()
+        res_json.get("candidates", [{}])[0]
+        .get("content", {})
+        .get("parts", [{}])[0]
+        .get("text", "[]")
     )
-
-    if not texto_respuesta:
-      enviar_respuesta_telegram(
-          chat_id, "⚠️ La IA no devolvió contenido válido."
-      )
-      return jsonify({"status": "success"}), 200
 
     parsed_data = json.loads(texto_respuesta)
     transacciones = (
         parsed_data if isinstance(parsed_data, list) else [parsed_data]
     )
+
+    if not transacciones:
+      enviar_respuesta_telegram(
+          chat_id, "⚠️ No pude detectar ningún gasto válido en tu mensaje."
+      )
+      return jsonify({"status": "success"}), 200
 
     registros_exitosos = 0
     for tx in transacciones:
@@ -140,7 +122,7 @@ def receive_telegram_message():
     )
 
   except Exception as e:
-    print(f"Error procesando solicitud general: {e}")
+    print(f"Error procesando solicitud: {e}")
     if chat_id and TELEGRAM_TOKEN:
       enviar_respuesta_telegram(
           chat_id, "❌ Ocurrió un error procesando tu gasto."
