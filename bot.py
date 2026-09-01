@@ -6,14 +6,14 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Credenciales y URLs esenciales
+# Credenciales y URLs
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiJXYWxsZXQiLCJzdWIiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc3NjkxMCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyNDA5MTAsImp0aSI6ImIxNjgzNTdmLWQ2ZWYtNDZlZi1hYjc0LTAwNTFhNzliNGY5MCIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.BYqlLm0cNUgt5zIsN8VPSLCt89x7IQmxL5a9IjfvmyyjBSh2eQgvmbQ1qqCG7L4OyjFOKzyHdExMyQ9m7g4fxrHF4I1ZtrIojhYljLvfZuKrgT-1IXGAQgF-tsIMAuaTQsPRrBLE28URn-ecAlvufTRW8yM9I6MSmQDL9PRBlSBhqxi-iVi1LfDpljrxsD2tpSWfZFJ8Ft9O7mlgPwvpNNJEZCKlOKteKyFRxQ7RkKWmKA_ekWi4ZCIsHWggUeod8SRp5GYO8ZWmLu8G_S82dEm3DPegt0nDooks-ff5PacXQ-vwviIFh9KiylFgCWG7u3WF2wqaIL80ONALRqcI8g"
 
-WALLET_TOKEN = "eyJraWQiOiI1NmYxZjE1ZS1hZTllLTQzMzQtYjUzYS0zNGM1YWYyMzBiNjMiLCJhbGciOiJSUzI1NiJ9.eyJmbGF2b3IiOiI2NmMzODViOC1iMzU5LTQ3YjEtYmE3Ni0wMDNiM2UwYWRkNDAiLCJhdWQiOiJmMzE2MmFkNS00NmIwLTRiYTctYThmMy0yMzkxMTBkNzhkNjgiLCJpc3MiOiJXYWxsZXQtYXV0aCIsImV4cCI6MTgxOTc2NzM1MCwiZ3JhbnQiOiJhcGkiLCJpYXQiOjE3ODgyMzEzTSIsImp0aSI6ImZmYzhmZWRiLWE2ODQtNDY2ZC1iZDAxLTgzZTQxNjA1OGU2YiIsImVtYWlsIjoiYXBvbGluYXJlczIuMEBnbWFpbC5jb20ifQ.kYNZRFZqBXI3u25OuxZKGcGgx8TyAU3J4Y2ehrjojM5kEI2lbTfJHe5wYSuaGE0PXJN-CgxaB5KdFF3-3ogBIa1r0zG16RYnTDs6w2CDzAbWm5sRFO9EPCct5ZyGQ28AJddrHSAIhLODsyuGigl_xSmdtCwJwPTh7xxgnEcPfW5SyIx5AE0TY6EDnoXstPJ0kmszat3RGH_aD7G-ulXYDn5KIJbCgjv2if7l-Wal9mNjfKtcmYxVSGJSckwLSWqPldJonOR6_o6jKGQIyeP6pta0LT_Mnw8LgHp_EM78cmrHOI10kRdRxhCEErgNHW4FUdmj6ZhrCt-RdH37MsBbGA"
 WALLET_API_URL = "https://rest.budgetbakers.com/wallet/v1/api/records"
 
-# Mapeo de billeteras (Reemplaza los strings por los IDs reales de tu API de BudgetBakers cuando gustes)
+# Mapeo de billeteras (ajusta las claves o reemplaza los IDs cuando los tengas listos)
 MIS_BILLETERAS = {
     "efectivo": "ID_REAL_EFECTIVO",
     "santander": "ID_REAL_SANTANDER",
@@ -46,7 +46,6 @@ def receive_telegram_message():
       )
       return jsonify({"status": "no_text"}), 200
 
-    # 1. Prompt estructurado para Gemini
     prompt_base = """
         Analiza el texto del usuario y extrae los gastos o transacciones financieras.
         Devuelve estrictamente una lista JSON pura con objetos que tengan exactamente estas claves:
@@ -67,45 +66,29 @@ def receive_telegram_message():
         "generationConfig": {"response_mime_type": "application/json"},
     }
 
-    # 2. Petición segura a Gemini con control de errores HTTP
     res_gemini = requests.post(gemini_url, json=payload_gemini, timeout=10)
     if res_gemini.status_code != 200:
-      print(f"Error en API Gemini: {res_gemini.text}")
       enviar_respuesta_telegram(
           chat_id, "❌ Error de comunicación con el motor de IA."
       )
       return jsonify({"status": "gemini_error"}), 200
 
     res_json = res_gemini.json()
-
-    # 3. Extracción segura de la respuesta
-    try:
-      candidates = res_json.get("candidates", [])
-      if not candidates:
-        raise ValueError("No candidates found in Gemini response")
-
-      texto_respuesta = (
-          candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
-      )
-    except Exception as parse_err:
-      print(f"Error extrayendo texto de Gemini: {parse_err}, Payload: {res_json}")
+    candidates = res_json.get("candidates", [])
+    if not candidates:
       enviar_respuesta_telegram(
-          chat_id, "⚠️ No pude interpretar la respuesta estructurada de la IA."
+          chat_id, "⚠️ No obtuve respuesta válida de la IA."
       )
-      return jsonify({"status": "extraction_error"}), 200
+      return jsonify({"status": "no_candidates"}), 200
 
-    # 4. Parseo seguro de JSON con manejo de excepciones
-    try:
-      parsed_data = json.loads(texto_respuesta)
-      transacciones = (
-          parsed_data if isinstance(parsed_data, list) else [parsed_data]
-      )
-    except json.JSONDecodeError:
-      print(f"Error de JSON decodificando: {texto_respuesta}")
-      enviar_respuesta_telegram(
-          chat_id, "⚠️ El formato devuelto por la IA no fue un JSON válido."
-      )
-      return jsonify({"status": "json_decode_error"}), 200
+    texto_respuesta = (
+        candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
+    )
+
+    parsed_data = json.loads(texto_respuesta)
+    transacciones = (
+        parsed_data if isinstance(parsed_data, list) else [parsed_data]
+    )
 
     if not transacciones:
       enviar_respuesta_telegram(
@@ -113,7 +96,6 @@ def receive_telegram_message():
       )
       return jsonify({"status": "no_transactions"}), 200
 
-    # 5. Iteración y registro en BudgetBakers Wallet
     registros_exitosos = 0
     headers_wallet = {
         "Authorization": f"Bearer {WALLET_TOKEN}",
@@ -121,42 +103,35 @@ def receive_telegram_message():
     }
 
     for tx in transacciones:
-      try:
-        monto = float(tx.get("amount", 0.0))
-        concepto = str(tx.get("note", "Gasto general"))
-        billetera_sugerida = str(tx.get("wallet", "")).lower()
+      monto = float(tx.get("amount", 0.0))
+      concepto = str(tx.get("note", "Gasto general"))
+      billetera_sugerida = str(tx.get("wallet", "")).lower()
 
-        if monto > 0:
-          payload_wallet = {
-              "amount": monto,
-              "currency": "ARS",
-              "note": concepto,
-              "type": 1,  # Gasto
-              "date": datetime.now().isoformat(),
-          }
+      if monto > 0:
+        payload_wallet = {
+            "amount": monto,
+            "currency": "ARS",
+            "note": concepto,
+            "type": 1,
+            "date": datetime.now().isoformat(),
+        }
 
-          # Asignar ID de cuenta si coincide con el mapeo
-          for key, acc_id in MIS_BILLETERAS.items():
-            if key in billetera_sugerida:
-              payload_wallet["accountId"] = acc_id
-              break
+        for key, acc_id in MIS_BILLETERAS.items():
+          if key in billetera_sugerida:
+            payload_wallet["accountId"] = acc_id
+            break
 
-          res_wallet = requests.post(
-              WALLET_API_URL, json=payload_wallet, headers=headers_wallet, timeout=10
-          )
-          
-          if res_wallet.status_code in [200, 201]:
-            registros_exitosos += 1
-          else:
-            print(f"Error en Wallet API: {res_wallet.status_code} - {res_wallet.text}")
+        res_wallet = requests.post(
+            WALLET_API_URL, json=payload_wallet, headers=headers_wallet, timeout=10
+        )
+        if res_wallet.status_code in [200, 201]:
+          registros_exitosos += 1
+        else:
+          print(f"Error en Wallet API: {res_wallet.status_code} - {res_wallet.text}")
 
-      except Exception as tx_err:
-        print(f"Error procesando transacción individual {tx}: {tx_err}")
-
-    # 6. Respuesta final al usuario en Telegram
     if registros_exitosos > 0:
       enviar_respuesta_telegram(
-          chat_id, f"✅ Se registraron {registros_exitosos} transacción(es) con éxito rey."
+          chat_id, f"✅ Se registraron {registros_exitosos} transacción(es) con éxito."
       )
     else:
       enviar_respuesta_telegram(
@@ -164,16 +139,12 @@ def receive_telegram_message():
       )
 
   except Exception as e:
-    print(f"Error crítico global en webhook: {e}")
+    print(f"Error crítico global: {e}")
     if chat_id:
-      try:
-        enviar_respuesta_telegram(
-            chat_id, "❌ Ocurrió un error inesperado procesando tu solicitud."
-        )
-      except:
-        pass
+      enviar_respuesta_telegram(
+          chat_id, "❌ Ocurrió un error inesperado procesando tu solicitud."
+      )
 
-  # Siempre devolvemos 200 a Telegram para evitar bucles de reintentos
   return jsonify({"status": "success"}), 200
 
 
