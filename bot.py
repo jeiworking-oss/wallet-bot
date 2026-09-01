@@ -53,7 +53,7 @@ def receive_message():
       monto = float(partes[0])
       concepto = partes[1] if len(partes) > 1 else "Gasto general"
 
-      payload_workspace = {
+      payload_wallet = {
           "amount": monto,
           "currency": "ARS",
           "note": concepto,
