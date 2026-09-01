@@ -1,8 +1,6 @@
 from datetime import datetime
 import json
 import os
-from google import genai
-from google.genai import types
 import requests
 from flask import Flask, jsonify, request
 
@@ -27,9 +25,6 @@ MIS_BILLETERAS = {
     "tdcnaranjax": "1aa446c0-d01e-4f22-b572-238979fc0a48",
     "tarjetanaranja": "1aa446c0-d01e-4f22-b572-238979fc0a48",
 }
-
-# Inicializar cliente oficial de Google GenAI
-ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 @app.route(f"/webhook/{TELEGRAM_TOKEN}", methods=["POST"])
@@ -63,24 +58,43 @@ def receive_telegram_message():
         Si no hay montos, devuelve [].
         """
 
-    # Llamada a Gemini con manejo de excepciones por timeout holgado
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
+    payload_gemini = {
+        "contents": [{
+            "parts": [{
+                "text": f"{prompt_base}\n\nMensaje del usuario: '{texto_usuario}'"
+            }]
+        }],
+        "generationConfig": {"response_mime_type": "application/json"},
+    }
+
+    # Llamada REST directa con timeout blindado de 180 segundos para lidiar con el cold start de Render
     try:
-      response = ai_client.models.generate_content(
-          model="gemini-2.5-flash",
-          contents=f"{prompt_base}\n\nMensaje del usuario: '{texto_usuario}'",
-          config=types.GenerateContentConfig(
-              response_mime_type="application/json"
-          ),
-      )
-      texto_respuesta = response.text if response.text else "[]"
+      res_gemini = requests.post(gemini_url, json=payload_gemini, timeout=180)
+      if res_gemini.status_code != 200:
+        print(f"Error de Gemini: {res_gemini.text}")
+        enviar_respuesta_telegram(
+            chat_id, "❌ Error de comunicación con el motor de IA."
+        )
+        return jsonify({"status": "gemini_error"}), 200
     except Exception as gemini_err:
-      print(f"Error con Gemini (timeout de 180s alcanzado): {gemini_err}")
+      print(f"Timeout con Gemini: {gemini_err}")
       enviar_respuesta_telegram(
-          chat_id,
-          "⚠️ El servidor despertó tarde o la IA tardó demasiado. Intenta de"
-          " nuevo.",
+          chat_id, "⚠️ El motor de IA tardó demasiado en responder."
       )
       return jsonify({"status": "gemini_timeout"}), 200
+
+    res_json = res_gemini.json()
+    candidates = res_json.get("candidates", [])
+    if not candidates:
+      enviar_respuesta_telegram(
+          chat_id, "⚠️ No obtuve respuesta válida de la IA."
+      )
+      return jsonify({"status": "no_candidates"}), 200
+
+    texto_respuesta = (
+        candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "[]")
+    )
 
     try:
       parsed_data = json.loads(texto_respuesta)
@@ -130,7 +144,6 @@ def receive_telegram_message():
         "Content-Type": "application/json",
     }
 
-    # Petición a Wallet con timeout blindado de 180 segundos (3 minutos)
     res_wallet = requests.post(
         WALLET_API_URL, json=payloads_wallet, headers=headers_wallet, timeout=180
     )
@@ -138,14 +151,12 @@ def receive_telegram_message():
     if res_wallet.status_code in [200, 201]:
       enviar_respuesta_telegram(
           chat_id,
-          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en"
-          " tu Wallet.",
+          f"✅ Se registraron {len(payloads_wallet)} transacción(es) con éxito en tu Wallet.",
       )
     else:
       print(f"Error en Wallet API ({res_wallet.status_code}): {res_wallet.text}")
       enviar_respuesta_telegram(
-          chat_id,
-          f"⚠️ La API de Wallet rechazó el registro: {res_wallet.text}",
+          chat_id, f"⚠️ La API de Wallet rechazó el registro: {res_wallet.text}"
       )
 
   except Exception as e:
