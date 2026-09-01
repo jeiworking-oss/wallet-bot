@@ -1,4 +1,3 @@
-from datetime import datetime
 import json
 import os
 import requests
@@ -68,7 +67,6 @@ def receive_telegram_message():
         "generationConfig": {"response_mime_type": "application/json"},
     }
 
-    # Llamada REST directa con timeout blindado de 180 segundos para lidiar con el cold start de Render
     try:
       res_gemini = requests.post(gemini_url, json=payload_gemini, timeout=180)
       if res_gemini.status_code != 200:
@@ -120,11 +118,8 @@ def receive_telegram_message():
       billetera_sugerida = str(tx.get("wallet", "")).lower()
 
       if monto > 0:
-        item = {
-            "amount": -abs(monto),  # Negativo para registrar como gasto
-            "note": concepto,
-            "date": datetime.now().isoformat() + "Z",
-        }
+        # Estructura limpia sin 'date', sin 'currency', sin 'type'
+        item = {"amount": -abs(monto), "note": concepto}
 
         for key, acc_id in MIS_BILLETERAS.items():
           if key in billetera_sugerida:
